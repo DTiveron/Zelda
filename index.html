@@ -32,8 +32,8 @@
     .sequence { letter-spacing: .18em; color: var(--gold); font-weight: 900; }
     .reset { border: 1px solid #56645a; background: #202820; color: var(--ink); padding: 8px 11px; border-radius: 9px; font: inherit; cursor: pointer; }
     .reset:hover { border-color: var(--green); }
-    .canvas-wrap { position: relative; border: 2px solid #526157; border-radius: 10px; overflow: hidden; background: #1e3620; }
-    canvas { width: 100%; height: auto; aspect-ratio: 64/42; display: block; image-rendering: pixelated; touch-action: none; }
+    .canvas-wrap { position: relative; border: 4px solid #d3a83b; border-radius: 8px; overflow: hidden; background: #f1cd95; }
+    canvas { width: 100%; height: auto; aspect-ratio: 542/367; display: block; image-rendering: pixelated; touch-action: none; }
     .flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: #fff; transition: opacity .16s linear; }
     .flash.on { opacity: .38; }
     .instructions { text-align: center; color: var(--muted); font-size: .86rem; margin: 11px 0 4px; }
@@ -62,7 +62,6 @@
     <h1 id="heading">LOST FOREST PROTOCOL</h1>
     <p class="intro" id="intro"></p>
   </section>
-
   <section class="game-shell">
     <div class="status-row">
       <div class="status">
@@ -71,12 +70,10 @@
       </div>
       <button class="reset" id="resetBtn" type="button">Reset</button>
     </div>
-
     <div class="canvas-wrap">
-      <canvas id="game" width="640" height="420" aria-label="Lost forest navigation puzzle"></canvas>
+      <canvas id="game" width="542" height="367" aria-label="Lost forest navigation puzzle"></canvas>
       <div class="flash" id="flash"></div>
     </div>
-
     <div class="instructions">Arrow keys / WASD. On phones, use the controls below.</div>
     <div class="dpad" aria-label="Movement controls">
       <button class="up" data-dir="up" aria-label="Move up">▲</button>
@@ -84,7 +81,6 @@
       <button class="down" data-dir="down" aria-label="Move down">▼</button>
       <button class="right" data-dir="right" aria-label="Move right">▶</button>
     </div>
-
     <div class="success" id="success">
       <h2 id="successHeading">ACCESS GRANTED</h2>
       <p id="successSubheading"></p>
@@ -93,218 +89,231 @@
   </section>
   <div class="hint">If the forest seems impossible, the route may be hidden somewhere else in your materials.</div>
 </main>
-
 <script>
 (() => {
   const cfg = window.GAME_CONFIG || {};
-  document.title = cfg.pageTitle || "Lost Forest";
-  document.getElementById("heading").textContent = cfg.heading || "LOST FOREST PROTOCOL";
-  document.getElementById("intro").textContent = cfg.intro || "Escape the forest.";
-  document.getElementById("successHeading").textContent = cfg.successHeading || "ACCESS GRANTED";
-  document.getElementById("successSubheading").textContent = cfg.successSubheading || "The forest has released you.";
-  document.getElementById("finalClue").textContent = cfg.finalClue || "YOUR NEXT CLUE GOES HERE";
+  document.title = cfg.pageTitle || 'Lost Forest';
+  document.getElementById('heading').textContent = cfg.heading || 'LOST FOREST PROTOCOL';
+  document.getElementById('intro').textContent = cfg.intro || 'Escape the forest.';
+  document.getElementById('successHeading').textContent = cfg.successHeading || 'ACCESS GRANTED';
+  document.getElementById('successSubheading').textContent = cfg.successSubheading || 'The forest has released you.';
+  document.getElementById('finalClue').textContent = cfg.finalClue || 'YOUR NEXT CLUE GOES HERE';
 
-  const solution = (cfg.solution || ["N","W","S","W"]).join("");
-  const canvas = document.getElementById("game");
-  const ctx = canvas.getContext("2d");
-  const sequenceEl = document.getElementById("sequence");
-  const roomEl = document.getElementById("roomNumber");
-  const successEl = document.getElementById("success");
-  const flash = document.getElementById("flash");
-  const resetBtn = document.getElementById("resetBtn");
+  const solution = (cfg.solution || ['N','W','S','W']).join('');
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const sequenceEl = document.getElementById('sequence');
+  const roomEl = document.getElementById('roomNumber');
+  const successEl = document.getElementById('success');
+  const flash = document.getElementById('flash');
+  const resetBtn = document.getElementById('resetBtn');
 
   const W = canvas.width, H = canvas.height;
-  const player = { x: W/2, y: H/2, r: 13, speed: 3.25 };
+  const BUSH = 22;
+  const bushRects = [];
+  const player = { x: W / 2, y: H / 2, r: 7, speed: 2.2 };
   let keys = {left:false,right:false,up:false,down:false};
   let history = [];
   let won = false;
   let room = 1;
   let transitionLock = 0;
+  let lastDir = 'down';
+  let stepTick = 0;
+  let linkReady = false;
+  const linkSprite = new Image();
+  linkSprite.onload = () => { linkReady = true; };
+  linkSprite.src = 'link_sprite.png';
 
-  function rand(seed) {
-    const x = Math.sin(seed * 12.9898) * 43758.5453;
-    return x - Math.floor(x);
-  }
+  const exitGap = {
+    north: { x1: 247, x2: 295 },
+    south: { x1: 247, x2: 295 },
+    west:  { y1: 151, y2: 215 },
+    east:  { y1: 151, y2: 215 }
+  };
 
-  function drawPixelTree(x,y,s,seed) {
-    const greens = ["#1d4e2a","#275f31","#34733b","#133a22"];
-    ctx.fillStyle = "#5a3a22";
-    ctx.fillRect(x-s*.10,y+s*.18,s*.20,s*.45);
-    for(let i=0;i<8;i++) {
-      const ox = (rand(seed+i)-.5)*s*.72;
-      const oy = (rand(seed+i+20)-.5)*s*.42 - s*.12;
-      ctx.fillStyle = greens[i%greens.length];
-      ctx.fillRect(Math.round(x+ox-s*.22), Math.round(y+oy-s*.22), Math.round(s*.44), Math.round(s*.44));
+  const bushSprite = [
+    '....TTT....',
+    '..TTTTTTT..',
+    '.TOOOOOOOT.',
+    'TOOOOOOOOOT',
+    'TOOooOOoOOT',
+    'TOOoOOOOOOT',
+    'TOOOOOoOOOT',
+    '.TOOOOOOOT.',
+    '..TOOOOO...',
+    '...BBBB....',
+    '...........'
+  ];
+  const bushPalette = {
+    '.': null,
+    'T': '#43190d',
+    'O': '#bb4b17',
+    'o': '#1c0b07',
+    'B': '#2a43a9'
+  };
+
+  const fallbackHero = [
+    '....GGGG....',
+    '...GGGGGG...',
+    '.....GG.....',
+    '....hhhh....',
+    '...ssssss...',
+    '...sees.s...',
+    '...ssssss...',
+    '...gGGGGg...',
+    '..gGGGGGGg..',
+    '..gGGBBGGg..',
+    '...gGBBGg...',
+    '...b....b...',
+    '..bb....bb..',
+    '.yy......yy.',
+    '.y........y.',
+    '............'
+  ];
+  const heroPalette = { '.': null, 'G': '#b6f04a', 'g': '#79da36', 'h': '#9d5a16', 's': '#f7c86f', 'e': '#171717', 'b': '#6c401d', 'B': '#d78417', 'y': '#dcae3f' };
+
+  function drawPixelArt(sprite, palette, px, py, scale = 2) {
+    for (let r = 0; r < sprite.length; r++) {
+      for (let c = 0; c < sprite[0].length; c++) {
+        const ch = sprite[r][c];
+        const color = palette[ch];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(px + c * scale, py + r * scale, scale, scale);
+      }
     }
   }
-
+  function addBushBlock(x, y, cols, rows) {
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) bushRects.push({ x: x + c * BUSH, y: y + r * BUSH, w: BUSH, h: BUSH });
+  }
+  function buildBushMap() {
+    bushRects.length = 0;
+    // top and bottom have one obvious opening only (center opening)
+    addBushBlock(10, 10, 10, 4);
+    addBushBlock(318, 10, 10, 4);
+    addBushBlock(10, 269, 10, 4);
+    addBushBlock(318, 269, 10, 4);
+    // left and right side walls around the center gap, like the original room flow
+    addBushBlock(10, 120, 3, 2);
+    addBushBlock(10, 214, 3, 2);
+    addBushBlock(466, 120, 3, 2);
+    addBushBlock(466, 214, 3, 2);
+  }
+  function drawBushTile(x, y) {
+    ctx.fillStyle = '#f3cf97'; ctx.fillRect(x, y, BUSH, BUSH);
+    drawPixelArt(bushSprite, bushPalette, x, y, 2);
+  }
   function drawForest() {
-    ctx.fillStyle = "#31572c";
-    ctx.fillRect(0,0,W,H);
-    // checker grass
-    for(let y=0;y<H;y+=32) for(let x=0;x<W;x+=32) {
-      if(((x+y)/32)%2===0){ctx.fillStyle="#365f30";ctx.fillRect(x,y,32,32)}
-    }
-
-    // central clearing
-    ctx.fillStyle = "#789b43";
-    ctx.fillRect(90,76,W-180,H-152);
-    ctx.fillStyle = "#96ad54";
-    ctx.fillRect(116,100,W-232,H-200);
-
-    // forest frame with four exits
-    for(let x=22;x<W;x+=55) {
-      if(x < W/2-58 || x > W/2+58) {
-        drawPixelTree(x,35,58,x+room*31);
-        drawPixelTree(x,H-32,58,x+room*47);
-      }
-    }
-    for(let y=76;y<H-50;y+=58) {
-      if(y < H/2-52 || y > H/2+52) {
-        drawPixelTree(30,y,58,y+room*53);
-        drawPixelTree(W-28,y,58,y+room*71);
-      }
-    }
-
-    // four path hints
-    ctx.fillStyle="#c6ad6f";
-    ctx.fillRect(W/2-34,0,68,80);
-    ctx.fillRect(W/2-34,H-80,68,80);
-    ctx.fillRect(0,H/2-34,98,68);
-    ctx.fillRect(W-98,H/2-34,98,68);
-
-    // central stone marker
-    ctx.fillStyle="#5e665e";
-    ctx.fillRect(W/2-38,H/2-25,76,50);
-    ctx.fillStyle="#242b26";
-    ctx.font="bold 15px monospace";
-    ctx.textAlign="center";
-    ctx.fillText("?",W/2,H/2+6);
-
-    // border vignette
-    const g = ctx.createRadialGradient(W/2,H/2,90,W/2,H/2,390);
-    g.addColorStop(0,"#0000"); g.addColorStop(1,"#061006aa");
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#f3cf97'; ctx.fillRect(0, 0, W, H);
+    bushRects.forEach(b => drawBushTile(b.x, b.y));
+    // redraw visible openings so they read clearly
+    ctx.fillStyle = '#f3cf97';
+    ctx.fillRect(exitGap.north.x1, 0, exitGap.north.x2 - exitGap.north.x1, 10);
+    ctx.fillRect(0, exitGap.west.y1, 10, exitGap.west.y2 - exitGap.west.y1);
+    ctx.fillRect(exitGap.south.x1, H - 10, exitGap.south.x2 - exitGap.south.x1, 10);
+    ctx.fillRect(W - 10, exitGap.east.y1, 10, exitGap.east.y2 - exitGap.east.y1);
+    ctx.strokeStyle = '#9f9f9f'; ctx.lineWidth = 2; ctx.strokeRect(1, 1, W - 2, H - 2);
   }
-
   function drawHero() {
-    const x=Math.round(player.x), y=Math.round(player.y);
-    // shadow
-    ctx.fillStyle="#0008";ctx.fillRect(x-11,y+12,22,7);
-    // body
-    ctx.fillStyle="#e7c47a";ctx.fillRect(x-8,y-8,16,14);
-    ctx.fillStyle="#4fa43b";ctx.fillRect(x-10,y+4,20,18);
-    // cap
-    ctx.fillStyle="#2f812f";ctx.fillRect(x-13,y-14,22,8);ctx.fillRect(x-17,y-10,13,6);
-    // legs
-    ctx.fillStyle="#6e3e22";ctx.fillRect(x-9,y+22,7,9);ctx.fillRect(x+2,y+22,7,9);
-    // shield
-    ctx.fillStyle="#8f3a2e";ctx.fillRect(x+9,y+4,8,14);
-    ctx.fillStyle="#e6a840";ctx.fillRect(x+11,y+8,4,6);
+    const bob = (Math.floor(stepTick / 8) % 2 === 0) ? 0 : 1;
+    const x = Math.round(player.x);
+    const y = Math.round(player.y + bob);
+    if (linkReady) {
+      const w = 26, h = 32;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(linkSprite, x - w/2, y - h/2, w, h);
+    } else {
+      ctx.fillStyle = '#b67f4d'; ctx.fillRect(x - 6, y + 14, 12, 2);
+      drawPixelArt(fallbackHero, heroPalette, x - 12, y - 16, 2);
+    }
   }
-
   function draw() {
     drawForest();
     drawHero();
-    if(won) {
-      ctx.fillStyle="#0009";ctx.fillRect(0,0,W,H);
-      ctx.fillStyle="#f0c34a";ctx.font="bold 34px monospace";ctx.textAlign="center";
-      ctx.fillText("FOREST CLEARED",W/2,H/2-8);
-      ctx.fillStyle="#fff";ctx.font="18px monospace";ctx.fillText("The route was correct.",W/2,H/2+28);
+    if (won) {
+      ctx.fillStyle = '#0009'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#f0c34a'; ctx.font = 'bold 28px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('FOREST CLEARED', W / 2, H / 2 - 8);
+      ctx.fillStyle = '#fff'; ctx.font = '16px monospace'; ctx.fillText('The route was correct.', W / 2, H / 2 + 22);
     }
   }
-
+  function playerBox(nx = player.x, ny = player.y) { return { x: nx - 8, y: ny - 8, w: 16, h: 16 }; }
+  function intersects(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+  function collides(nx, ny) { const box = playerBox(nx, ny); return bushRects.some(b => intersects(box, b)); }
   function updateSequence() {
-    const padded = ["—","—","—","—"];
-    history.slice(-4).forEach((d,i)=>padded[4-Math.min(4,history.length)+i]=d);
-    sequenceEl.textContent = padded.join(" ");
+    const padded = ['—','—','—','—'];
+    history.slice(-4).forEach((d, i) => padded[4 - Math.min(4, history.length) + i] = d);
+    sequenceEl.textContent = padded.join(' ');
   }
-
   function chime() {
     try {
       const ac = new (window.AudioContext || window.webkitAudioContext)();
-      const notes=[523.25,659.25,783.99,1046.5];
-      notes.forEach((f,i)=>{
-        const o=ac.createOscillator(), gain=ac.createGain();
-        o.type="square";o.frequency.value=f;
-        gain.gain.setValueAtTime(.0001,ac.currentTime+i*.09);
-        gain.gain.exponentialRampToValueAtTime(.06,ac.currentTime+i*.09+.015);
-        gain.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+i*.09+.18);
-        o.connect(gain);gain.connect(ac.destination);
-        o.start(ac.currentTime+i*.09);o.stop(ac.currentTime+i*.09+.19);
+      const notes = [523.25, 659.25, 783.99, 1046.5];
+      notes.forEach((f, i) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'square'; o.frequency.value = f;
+        g.gain.setValueAtTime(.0001, ac.currentTime + i * .09);
+        g.gain.exponentialRampToValueAtTime(.06, ac.currentTime + i * .09 + .015);
+        g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + i * .09 + .18);
+        o.connect(g); g.connect(ac.destination); o.start(ac.currentTime + i * .09); o.stop(ac.currentTime + i * .09 + .19);
       });
-    } catch(e) {}
+    } catch (e) {}
   }
-
   function recordDirection(dir) {
-    if(won || transitionLock>0) return;
-    transitionLock = 14;
-    history.push(dir);
-    if(history.length>4) history.shift();
-    room++;
-    roomEl.textContent = String(room).padStart(2,"0");
-    updateSequence();
-    flash.classList.add("on");setTimeout(()=>flash.classList.remove("on"),150);
-    if(history.length===4 && history.join("")===solution) {
-      won=true;
-      chime();
-      successEl.classList.add("show");
-      successEl.scrollIntoView({behavior:"smooth",block:"nearest"});
-    }
+    if (won || transitionLock > 0) return;
+    transitionLock = 14; history.push(dir); if (history.length > 4) history.shift(); room++;
+    roomEl.textContent = String(room).padStart(2, '0'); updateSequence();
+    flash.classList.add('on'); setTimeout(() => flash.classList.remove('on'), 150);
+    if (history.length === 4 && history.join('') === solution) { won = true; chime(); successEl.classList.add('show'); successEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
   }
-
   function resetPositionFor(dir) {
-    if(dir==="W") { player.x=W-player.r-4; player.y=H/2; }
-    if(dir==="E") { player.x=player.r+4; player.y=H/2; }
-    if(dir==="N") { player.y=H-player.r-4; player.x=W/2; }
-    if(dir==="S") { player.y=player.r+4; player.x=W/2; }
+    if (dir === 'W') { player.x = W - player.r - 18; player.y = H / 2; }
+    if (dir === 'E') { player.x = player.r + 18; player.y = H / 2; }
+    if (dir === 'N') { player.y = H - player.r - 18; player.x = W / 2; }
+    if (dir === 'S') { player.y = player.r + 18; player.x = W / 2; }
   }
-
+  function handleExits() {
+    if (player.y < -player.r && player.x >= exitGap.north.x1 && player.x <= exitGap.north.x2) { recordDirection('N'); resetPositionFor('N'); return; }
+    if (player.x < -player.r && player.y >= exitGap.west.y1 && player.y <= exitGap.west.y2) { recordDirection('W'); resetPositionFor('W'); return; }
+    if (player.y > H + player.r && player.x >= exitGap.south.x1 && player.x <= exitGap.south.x2) { recordDirection('S'); resetPositionFor('S'); return; }
+    if (player.x > W + player.r && player.y >= exitGap.east.y1 && player.y <= exitGap.east.y2) { recordDirection('E'); resetPositionFor('E'); return; }
+    if (player.x < player.r && !(player.y >= exitGap.west.y1 && player.y <= exitGap.west.y2)) player.x = player.r;
+    if (player.x > W - player.r && !(player.y >= exitGap.east.y1 && player.y <= exitGap.east.y2)) player.x = W - player.r;
+    if (player.y < player.r && !(player.x >= exitGap.north.x1 && player.x <= exitGap.north.x2)) player.y = player.r;
+    if (player.y > H - player.r && !(player.x >= exitGap.south.x1 && player.x <= exitGap.south.x2)) player.y = H - player.r;
+  }
   function update() {
-    if(transitionLock>0) transitionLock--;
-    if(!won) {
-      let dx=(keys.right?1:0)-(keys.left?1:0);
-      let dy=(keys.down?1:0)-(keys.up?1:0);
-      if(dx&&dy){dx*=.707;dy*=.707}
-      player.x += dx*player.speed;
-      player.y += dy*player.speed;
-
-      if(player.x < -player.r) { recordDirection("W"); resetPositionFor("W"); }
-      else if(player.x > W+player.r) { recordDirection("E"); resetPositionFor("E"); }
-      else if(player.y < -player.r) { recordDirection("N"); resetPositionFor("N"); }
-      else if(player.y > H+player.r) { recordDirection("S"); resetPositionFor("S"); }
+    if (transitionLock > 0) transitionLock--;
+    stepTick++;
+    if (!won) {
+      let dx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+      let dy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+      if (dx && dy) { dx *= .707; dy *= .707; }
+      const nx = player.x + dx * player.speed; if (!collides(nx, player.y)) player.x = nx;
+      const ny = player.y + dy * player.speed; if (!collides(player.x, ny)) player.y = ny;
+      handleExits();
     }
-    draw();
-    requestAnimationFrame(update);
+    draw(); requestAnimationFrame(update);
   }
-
-  const mapKey = (key,down) => {
-    const k=key.toLowerCase();
-    if(k==="arrowleft"||k==="a") keys.left=down;
-    if(k==="arrowright"||k==="d") keys.right=down;
-    if(k==="arrowup"||k==="w") keys.up=down;
-    if(k==="arrowdown"||k==="s") keys.down=down;
+  const mapKey = (key, down) => {
+    const k = key.toLowerCase();
+    if (k === 'arrowleft' || k === 'a') keys.left = down;
+    if (k === 'arrowright' || k === 'd') keys.right = down;
+    if (k === 'arrowup' || k === 'w') keys.up = down;
+    if (k === 'arrowdown' || k === 's') keys.down = down;
   };
-  window.addEventListener("keydown",e=>{ if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","w","a","s","d","W","A","S","D"].includes(e.key)) e.preventDefault(); mapKey(e.key,true); });
-  window.addEventListener("keyup",e=>mapKey(e.key,false));
-  window.addEventListener("blur",()=>keys={left:false,right:false,up:false,down:false});
-
-  document.querySelectorAll("[data-dir]").forEach(btn=>{
-    const dir=btn.dataset.dir;
-    const set=v=>{keys[dir]=v;btn.classList.toggle("active",v)};
-    btn.addEventListener("pointerdown",e=>{e.preventDefault();set(true);btn.setPointerCapture(e.pointerId)});
-    btn.addEventListener("pointerup",()=>set(false));
-    btn.addEventListener("pointercancel",()=>set(false));
-    btn.addEventListener("pointerleave",()=>set(false));
+  window.addEventListener('keydown', e => { if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','w','a','s','d','W','A','S','D'].includes(e.key)) e.preventDefault(); mapKey(e.key, true); });
+  window.addEventListener('keyup', e => mapKey(e.key, false));
+  window.addEventListener('blur', () => keys = { left:false, right:false, up:false, down:false });
+  document.querySelectorAll('[data-dir]').forEach(btn => {
+    const dir = btn.dataset.dir; const set = v => { keys[dir] = v; btn.classList.toggle('active', v); };
+    btn.addEventListener('pointerdown', e => { e.preventDefault(); set(true); btn.setPointerCapture(e.pointerId); });
+    btn.addEventListener('pointerup', () => set(false)); btn.addEventListener('pointercancel', () => set(false)); btn.addEventListener('pointerleave', () => set(false));
   });
-
-  resetBtn.addEventListener("click",()=>{
-    history=[];won=false;room=1;player.x=W/2;player.y=H/2;successEl.classList.remove("show");roomEl.textContent="01";updateSequence();
+  resetBtn.addEventListener('click', () => {
+    history = []; won = false; room = 1; player.x = W / 2; player.y = H / 2; successEl.classList.remove('show'); roomEl.textContent = '01'; updateSequence();
   });
-
-  updateSequence();
-  draw();
-  requestAnimationFrame(update);
+  buildBushMap(); updateSequence(); draw(); requestAnimationFrame(update);
 })();
 </script>
 </body>
