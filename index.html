@@ -32,7 +32,7 @@
     .sequence { letter-spacing: .18em; color: var(--gold); font-weight: 900; }
     .reset { border: 1px solid #56645a; background: #202820; color: var(--ink); padding: 8px 11px; border-radius: 9px; font: inherit; cursor: pointer; }
     .reset:hover { border-color: var(--green); }
-    .canvas-wrap { position: relative; border: 2px solid #526157; border-radius: 10px; overflow: hidden; background: #1e3620; }
+    .canvas-wrap { position: relative; border: 4px solid #d3a83b; border-radius: 10px; overflow: hidden; background: #10280f; }
     canvas { width: 100%; height: auto; aspect-ratio: 64/42; display: block; image-rendering: pixelated; touch-action: none; }
     .flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: #fff; transition: opacity .16s linear; }
     .flash.on { opacity: .38; }
@@ -114,12 +114,14 @@
   const resetBtn = document.getElementById("resetBtn");
 
   const W = canvas.width, H = canvas.height;
-  const player = { x: W/2, y: H/2, r: 13, speed: 3.25 };
+  const player = { x: W/2, y: H/2, r: 16, speed: 3.15 };
   let keys = {left:false,right:false,up:false,down:false};
   let history = [];
   let won = false;
   let room = 1;
   let transitionLock = 0;
+  let lastDir = "down";
+  let stepTick = 0;
 
   function rand(seed) {
     const x = Math.sin(seed * 12.9898) * 43758.5453;
@@ -139,68 +141,160 @@
   }
 
   function drawForest() {
-    ctx.fillStyle = "#31572c";
+    // NES-style Lost Woods palette / tile treatment.
+    ctx.fillStyle = "#0f2c13";
     ctx.fillRect(0,0,W,H);
-    // checker grass
-    for(let y=0;y<H;y+=32) for(let x=0;x<W;x+=32) {
-      if(((x+y)/32)%2===0){ctx.fillStyle="#365f30";ctx.fillRect(x,y,32,32)}
-    }
 
-    // central clearing
-    ctx.fillStyle = "#789b43";
-    ctx.fillRect(90,76,W-180,H-152);
-    ctx.fillStyle = "#96ad54";
-    ctx.fillRect(116,100,W-232,H-200);
-
-    // forest frame with four exits
-    for(let x=22;x<W;x+=55) {
-      if(x < W/2-58 || x > W/2+58) {
-        drawPixelTree(x,35,58,x+room*31);
-        drawPixelTree(x,H-32,58,x+room*47);
+    // grass tiles
+    for(let y=0;y<H;y+=16) for(let x=0;x<W;x+=16) {
+      ctx.fillStyle = ((x/16+y/16)%2===0) ? "#2f6d2e" : "#347832";
+      ctx.fillRect(x,y,16,16);
+      if(((x*7+y*11+room)%5)===0){
+        ctx.fillStyle="#173f1d";
+        ctx.fillRect(x+3,y+3,3,3);
+        ctx.fillRect(x+10,y+9,2,2);
       }
     }
-    for(let y=76;y<H-50;y+=58) {
-      if(y < H/2-52 || y > H/2+52) {
-        drawPixelTree(30,y,58,y+room*53);
+
+    // sandy / olive clearing, closer to the original Zelda look
+    ctx.fillStyle = "#a8a45a";
+    ctx.fillRect(92,70,W-184,H-140);
+    for(let y=78;y<H-78;y+=20) for(let x=100;x<W-100;x+=20) {
+      ctx.fillStyle = ((x+y)/20)%2===0 ? "#b7ad62" : "#9f9852";
+      ctx.fillRect(x,y,20,20);
+    }
+
+    // four path openings
+    ctx.fillStyle="#b7ad62";
+    ctx.fillRect(W/2-40,0,80,88);
+    ctx.fillRect(W/2-40,H-88,80,88);
+    ctx.fillRect(0,H/2-40,108,80);
+    ctx.fillRect(W-108,H/2-40,108,80);
+
+    // dense tree wall around clearing
+    for(let x=26;x<W;x+=48) {
+      if(x < W/2-65 || x > W/2+65) {
+        drawPixelTree(x,34,58,x+room*31);
+        drawPixelTree(x,H-34,58,x+room*47);
+      }
+    }
+    for(let y=82;y<H-58;y+=52) {
+      if(y < H/2-58 || y > H/2+58) {
+        drawPixelTree(28,y,58,y+room*53);
         drawPixelTree(W-28,y,58,y+room*71);
       }
     }
 
-    // four path hints
-    ctx.fillStyle="#c6ad6f";
-    ctx.fillRect(W/2-34,0,68,80);
-    ctx.fillRect(W/2-34,H-80,68,80);
-    ctx.fillRect(0,H/2-34,98,68);
-    ctx.fillRect(W-98,H/2-34,98,68);
+    // central Triforce-like marker: recognizable game language without being the solution.
+    ctx.fillStyle="#73705a";
+    ctx.fillRect(W/2-36,H/2-28,72,56);
+    ctx.fillStyle="#4b493b";
+    ctx.fillRect(W/2-30,H/2-22,60,44);
+    ctx.fillStyle="#e3c34b";
+    ctx.beginPath();
+    ctx.moveTo(W/2,H/2-14); ctx.lineTo(W/2-11,H/2+4); ctx.lineTo(W/2+11,H/2+4); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(W/2-12,H/2+5); ctx.lineTo(W/2-23,H/2+23); ctx.lineTo(W/2-1,H/2+23); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(W/2+12,H/2+5); ctx.lineTo(W/2+1,H/2+23); ctx.lineTo(W/2+23,H/2+23); ctx.closePath(); ctx.fill();
 
-    // central stone marker
-    ctx.fillStyle="#5e665e";
-    ctx.fillRect(W/2-38,H/2-25,76,50);
-    ctx.fillStyle="#242b26";
-    ctx.font="bold 15px monospace";
-    ctx.textAlign="center";
-    ctx.fillText("?",W/2,H/2+6);
+    // NES-like HUD overlay
+    ctx.fillStyle="#080808e8";
+    ctx.fillRect(0,0,W,50);
+    ctx.font="bold 14px monospace";
+    ctx.textAlign="left";
+    ctx.fillStyle="#f3f0d8";
+    ctx.fillText("-LIFE-", W-130, 18);
+    ctx.fillStyle="#d92c2c";
+    ctx.font="22px monospace";
+    ctx.fillText("♥♥♥", W-132, 42);
+    ctx.fillStyle="#f3f0d8";
+    ctx.font="bold 14px monospace";
+    ctx.fillText("LINK", 18, 19);
+    ctx.fillStyle="#65a4d8";
+    ctx.fillText("♦ 00", 18, 41);
+    ctx.fillStyle="#f3f0d8";
+    ctx.fillText("KEY 0", 90, 41);
 
-    // border vignette
-    const g = ctx.createRadialGradient(W/2,H/2,90,W/2,H/2,390);
-    g.addColorStop(0,"#0000"); g.addColorStop(1,"#061006aa");
+    // dark pixel vignette
+    const g = ctx.createRadialGradient(W/2,H/2,120,W/2,H/2,400);
+    g.addColorStop(0,"#0000"); g.addColorStop(1,"#02070399");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
   }
 
   function drawHero() {
+    // Larger 8-bit green-tunic hero, deliberately styled like the classic NES adventure sprite.
     const x=Math.round(player.x), y=Math.round(player.y);
+    const bob = (Math.floor(stepTick/8)%2===0) ? 0 : 1;
+
+    ctx.save();
+    ctx.translate(x,y+bob);
+
+    // Flip the sideways sprite when moving left.
+    if(lastDir === "left") ctx.scale(-1,1);
+
     // shadow
-    ctx.fillStyle="#0008";ctx.fillRect(x-11,y+12,22,7);
-    // body
-    ctx.fillStyle="#e7c47a";ctx.fillRect(x-8,y-8,16,14);
-    ctx.fillStyle="#4fa43b";ctx.fillRect(x-10,y+4,20,18);
-    // cap
-    ctx.fillStyle="#2f812f";ctx.fillRect(x-13,y-14,22,8);ctx.fillRect(x-17,y-10,13,6);
-    // legs
-    ctx.fillStyle="#6e3e22";ctx.fillRect(x-9,y+22,7,9);ctx.fillRect(x+2,y+22,7,9);
-    // shield
-    ctx.fillStyle="#8f3a2e";ctx.fillRect(x+9,y+4,8,14);
-    ctx.fillStyle="#e6a840";ctx.fillRect(x+11,y+8,4,6);
+    ctx.fillStyle="#06100699";
+    ctx.fillRect(-13,15,26,6);
+
+    if(lastDir === "up") {
+      // long pointed green cap
+      ctx.fillStyle="#2f8a2f"; ctx.fillRect(-7,-18,15,6); ctx.fillRect(-12,-14,20,6); ctx.fillRect(-16,-10,11,5);
+      // blond hair
+      ctx.fillStyle="#e1b64a"; ctx.fillRect(-10,-9,20,7); ctx.fillRect(-12,-3,5,8); ctx.fillRect(7,-3,5,8);
+      // green tunic
+      ctx.fillStyle="#43a83f"; ctx.fillRect(-10,-1,20,17);
+      // belt
+      ctx.fillStyle="#6b3d22"; ctx.fillRect(-10,8,20,4); ctx.fillStyle="#d5ae45"; ctx.fillRect(-2,8,4,4);
+      // boots
+      ctx.fillStyle="#6b3d22"; ctx.fillRect(-9,16,7,7); ctx.fillRect(2,16,7,7);
+      // shield on back
+      ctx.fillStyle="#8d402e"; ctx.fillRect(7,0,9,14); ctx.fillStyle="#d8a73b"; ctx.fillRect(10,4,3,6);
+      // sword hilt
+      ctx.fillStyle="#d7d7cf"; ctx.fillRect(-15,-1,10,3); ctx.fillStyle="#7b4b24"; ctx.fillRect(-8,-5,3,8);
+    } else if(lastDir === "right" || lastDir === "left") {
+      // pointed cap trailing behind
+      ctx.fillStyle="#2f8a2f"; ctx.fillRect(-15,-13,15,6); ctx.fillRect(-11,-17,12,5);
+      // blond hair / head
+      ctx.fillStyle="#e1b64a"; ctx.fillRect(-5,-11,13,6);
+      ctx.fillStyle="#e8bd78"; ctx.fillRect(-3,-6,12,11);
+      // ear
+      ctx.fillStyle="#efc889"; ctx.fillRect(7,-6,6,4);
+      // eye
+      ctx.fillStyle="#171717"; ctx.fillRect(5,-3,2,2);
+      // tunic
+      ctx.fillStyle="#43a83f"; ctx.fillRect(-8,5,18,14); ctx.fillRect(8,7,5,9);
+      // belt
+      ctx.fillStyle="#6b3d22"; ctx.fillRect(-7,12,17,4); ctx.fillStyle="#d5ae45"; ctx.fillRect(2,12,4,4);
+      // boots
+      ctx.fillStyle="#6b3d22"; ctx.fillRect(-6,19,7,7); ctx.fillRect(5,19,7,7);
+      // shield forward
+      ctx.fillStyle="#99422f"; ctx.fillRect(11,4,10,16); ctx.fillStyle="#e5b445"; ctx.fillRect(14,8,4,8);
+      // sword sticking forward
+      ctx.fillStyle="#d9ddd5"; ctx.fillRect(20,8,14,3); ctx.fillStyle="#c6ced0"; ctx.fillRect(31,7,5,5);
+      ctx.fillStyle="#7b4b24"; ctx.fillRect(18,5,3,9);
+    } else {
+      // facing down
+      ctx.fillStyle="#2f8a2f"; ctx.fillRect(-13,-15,22,7); ctx.fillRect(-17,-11,13,6);
+      ctx.fillStyle="#e1b64a"; ctx.fillRect(-10,-8,20,6); ctx.fillRect(-11,-2,5,6); ctx.fillRect(6,-2,5,6);
+      ctx.fillStyle="#e8bd78"; ctx.fillRect(-7,-5,14,11);
+      // pointed ears
+      ctx.fillStyle="#efc889"; ctx.fillRect(-12,-3,5,4); ctx.fillRect(7,-3,5,4);
+      // eyes
+      ctx.fillStyle="#171717"; ctx.fillRect(-5,0,2,2); ctx.fillRect(3,0,2,2);
+      // tunic
+      ctx.fillStyle="#43a83f"; ctx.fillRect(-10,6,20,15);
+      // belt + buckle
+      ctx.fillStyle="#6b3d22"; ctx.fillRect(-10,13,20,4); ctx.fillStyle="#d5ae45"; ctx.fillRect(-2,13,4,4);
+      // boots
+      ctx.fillStyle="#6b3d22"; ctx.fillRect(-9,21,7,8); ctx.fillRect(2,21,7,8);
+      // wooden shield with bright emblem
+      ctx.fillStyle="#93442c"; ctx.fillRect(9,7,11,17); ctx.fillStyle="#dca43a"; ctx.fillRect(12,11,5,9); ctx.fillRect(10,14,9,3);
+      // sword hilt over shoulder
+      ctx.fillStyle="#d7d7cf"; ctx.fillRect(-18,7,12,3); ctx.fillStyle="#7b4b24"; ctx.fillRect(-8,4,3,9);
+    }
+
+    ctx.restore();
   }
 
   function draw() {
@@ -262,9 +356,11 @@
 
   function update() {
     if(transitionLock>0) transitionLock--;
+    stepTick++;
     if(!won) {
       let dx=(keys.right?1:0)-(keys.left?1:0);
       let dy=(keys.down?1:0)-(keys.up?1:0);
+      if(keys.left) lastDir="left"; else if(keys.right) lastDir="right"; else if(keys.up) lastDir="up"; else if(keys.down) lastDir="down";
       if(dx&&dy){dx*=.707;dy*=.707}
       player.x += dx*player.speed;
       player.y += dy*player.speed;
@@ -299,7 +395,7 @@
   });
 
   resetBtn.addEventListener("click",()=>{
-    history=[];won=false;room=1;player.x=W/2;player.y=H/2;successEl.classList.remove("show");roomEl.textContent="01";updateSequence();
+    history=[];won=false;room=1;player.x=W/2;player.y=H/2;lastDir="down";successEl.classList.remove("show");roomEl.textContent="01";updateSequence();
   });
 
   updateSequence();

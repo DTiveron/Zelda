@@ -34,3 +34,7 @@ You can double-click `index.html` and it should run in a browser. Keyboard contr
 ## Why this version is different from the older source
 
 The older page relied on separate Zelda image/audio files, an old jQuery dependency, and a PHP answer form. GitHub Pages is static hosting, so this version keeps the navigation mechanic but is completely self-contained and reveals your custom clue directly after the correct route.
+
+
+## Zelda-style revision
+This version makes the playable hero and forest much more immediately recognizable as a classic 8-bit fantasy-adventure homage: green pointed cap/tunic, blond hair, shield, sword, LIFE hearts, rupee-style HUD, Triforce-like marker, and NES-like forest tiles. No external image files are required; the art is drawn directly by the canvas code.
