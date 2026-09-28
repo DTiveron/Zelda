@@ -1,0 +1,5 @@
+Open config.js and replace:
+
+YOUR NEXT CLUE GOES HERE
+
+with the clue you want contestants to see after they solve North -> West -> South -> West.

@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#101510" />
+  <title>DHS SHIELD // Lost Forest</title>
+  <style>
+    :root {
+      --bg: #0c100d;
+      --panel: #151b17;
+      --ink: #f7f2df;
+      --muted: #abb8ad;
+      --red: #ba1d2c;
+      --green: #96d33b;
+      --gold: #f0c34a;
+      --line: #2c382e;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: radial-gradient(circle at top, #1a241c, var(--bg) 55%); color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    body { display: flex; justify-content: center; padding: 24px 14px 40px; }
+    main { width: min(920px, 100%); }
+    .masthead { text-align: center; margin-bottom: 14px; }
+    .eyebrow { color: var(--green); letter-spacing: .18em; font-weight: 800; font-size: .8rem; }
+    h1 { margin: 7px 0 7px; font-size: clamp(1.65rem, 5vw, 3rem); letter-spacing: .04em; }
+    .intro { margin: 0 auto; max-width: 720px; color: var(--muted); line-height: 1.45; }
+    .game-shell { margin-top: 18px; background: #090c0a; border: 2px solid #39473b; box-shadow: 0 18px 60px #0008; border-radius: 16px; padding: 14px; }
+    .status-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 10px; }
+    .status { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .chip { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 7px 10px; border-radius: 999px; font-size: .84rem; }
+    .chip strong { color: var(--ink); }
+    .sequence { letter-spacing: .18em; color: var(--gold); font-weight: 900; }
+    .reset { border: 1px solid #56645a; background: #202820; color: var(--ink); padding: 8px 11px; border-radius: 9px; font: inherit; cursor: pointer; }
+    .reset:hover { border-color: var(--green); }
+    .canvas-wrap { position: relative; border: 2px solid #526157; border-radius: 10px; overflow: hidden; background: #1e3620; }
+    canvas { width: 100%; height: auto; aspect-ratio: 64/42; display: block; image-rendering: pixelated; touch-action: none; }
+    .flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: #fff; transition: opacity .16s linear; }
+    .flash.on { opacity: .38; }
+    .instructions { text-align: center; color: var(--muted); font-size: .86rem; margin: 11px 0 4px; }
+    .dpad { margin: 13px auto 0; width: 190px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; user-select: none; }
+    .dpad button { min-height: 52px; border-radius: 10px; border: 1px solid #48584c; background: #1b241d; color: var(--ink); font-size: 1.35rem; font-weight: 900; cursor: pointer; touch-action: none; }
+    .dpad button:active, .dpad button.active { background: #364936; border-color: var(--green); color: var(--green); }
+    .dpad .up { grid-column: 2; }
+    .dpad .left { grid-column: 1; grid-row: 2; }
+    .dpad .down { grid-column: 2; grid-row: 2; }
+    .dpad .right { grid-column: 3; grid-row: 2; }
+    .success { display: none; margin-top: 16px; padding: 18px; border: 3px solid var(--gold); background: linear-gradient(135deg,#241a0c,#14100a); border-radius: 12px; text-align: center; box-shadow: 0 0 34px #f0c34a22; }
+    .success.show { display: block; animation: pop .35s ease-out; }
+    .success h2 { color: var(--gold); font-size: clamp(1.45rem, 4vw, 2.3rem); margin: 0 0 5px; }
+    .success p { margin: 4px 0; }
+    .clue { margin: 15px auto 3px; max-width: 720px; padding: 18px; border: 2px dashed var(--red); background: #fff8e8; color: #17120e; border-radius: 10px; font-family: Arial, Helvetica, sans-serif; font-size: clamp(1.1rem, 3vw, 1.55rem); font-weight: 800; line-height: 1.35; }
+    .hint { margin-top: 16px; text-align: center; color: #748078; font-size: .74rem; }
+    @keyframes pop { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @media (min-width: 760px) { .dpad { display: none; } }
+  </style>
+  <script src="config.js"></script>
+</head>
+<body>
+<main>
+  <section class="masthead">
+    <div class="eyebrow">DEERFIELD HIGH SCHOOL // SHIELD SYSTEM</div>
+    <h1 id="heading">LOST FOREST PROTOCOL</h1>
+    <p class="intro" id="intro"></p>
+  </section>
+
+  <section class="game-shell">
+    <div class="status-row">
+      <div class="status">
+        <div class="chip">LAST FOUR: <strong class="sequence" id="sequence">— — — —</strong></div>
+        <div class="chip">ROOM <strong id="roomNumber">01</strong></div>
+      </div>
+      <button class="reset" id="resetBtn" type="button">Reset</button>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="game" width="640" height="420" aria-label="Lost forest navigation puzzle"></canvas>
+      <div class="flash" id="flash"></div>
+    </div>
+
+    <div class="instructions">Arrow keys / WASD. On phones, use the controls below.</div>
+    <div class="dpad" aria-label="Movement controls">
+      <button class="up" data-dir="up" aria-label="Move up">▲</button>
+      <button class="left" data-dir="left" aria-label="Move left">◀</button>
+      <button class="down" data-dir="down" aria-label="Move down">▼</button>
+      <button class="right" data-dir="right" aria-label="Move right">▶</button>
+    </div>
+
+    <div class="success" id="success">
+      <h2 id="successHeading">ACCESS GRANTED</h2>
+      <p id="successSubheading"></p>
+      <div class="clue" id="finalClue"></div>
+    </div>
+  </section>
+  <div class="hint">If the forest seems impossible, the route may be hidden somewhere else in your materials.</div>
+</main>
+
+<script>
+(() => {
+  const cfg = window.GAME_CONFIG || {};
+  document.title = cfg.pageTitle || "Lost Forest";
+  document.getElementById("heading").textContent = cfg.heading || "LOST FOREST PROTOCOL";
+  document.getElementById("intro").textContent = cfg.intro || "Escape the forest.";
+  document.getElementById("successHeading").textContent = cfg.successHeading || "ACCESS GRANTED";
+  document.getElementById("successSubheading").textContent = cfg.successSubheading || "The forest has released you.";
+  document.getElementById("finalClue").textContent = cfg.finalClue || "YOUR NEXT CLUE GOES HERE";
+
+  const solution = (cfg.solution || ["N","W","S","W"]).join("");
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const sequenceEl = document.getElementById("sequence");
+  const roomEl = document.getElementById("roomNumber");
+  const successEl = document.getElementById("success");
+  const flash = document.getElementById("flash");
+  const resetBtn = document.getElementById("resetBtn");
+
+  const W = canvas.width, H = canvas.height;
+  const player = { x: W/2, y: H/2, r: 13, speed: 3.25 };
+  let keys = {left:false,right:false,up:false,down:false};
+  let history = [];
+  let won = false;
+  let room = 1;
+  let transitionLock = 0;
+
+  function rand(seed) {
+    const x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  function drawPixelTree(x,y,s,seed) {
+    const greens = ["#1d4e2a","#275f31","#34733b","#133a22"];
+    ctx.fillStyle = "#5a3a22";
+    ctx.fillRect(x-s*.10,y+s*.18,s*.20,s*.45);
+    for(let i=0;i<8;i++) {
+      const ox = (rand(seed+i)-.5)*s*.72;
+      const oy = (rand(seed+i+20)-.5)*s*.42 - s*.12;
+      ctx.fillStyle = greens[i%greens.length];
+      ctx.fillRect(Math.round(x+ox-s*.22), Math.round(y+oy-s*.22), Math.round(s*.44), Math.round(s*.44));
+    }
+  }
+
+  function drawForest() {
+    ctx.fillStyle = "#31572c";
+    ctx.fillRect(0,0,W,H);
+    // checker grass
+    for(let y=0;y<H;y+=32) for(let x=0;x<W;x+=32) {
+      if(((x+y)/32)%2===0){ctx.fillStyle="#365f30";ctx.fillRect(x,y,32,32)}
+    }
+
+    // central clearing
+    ctx.fillStyle = "#789b43";
+    ctx.fillRect(90,76,W-180,H-152);
+    ctx.fillStyle = "#96ad54";
+    ctx.fillRect(116,100,W-232,H-200);
+
+    // forest frame with four exits
+    for(let x=22;x<W;x+=55) {
+      if(x < W/2-58 || x > W/2+58) {
+        drawPixelTree(x,35,58,x+room*31);
+        drawPixelTree(x,H-32,58,x+room*47);
+      }
+    }
+    for(let y=76;y<H-50;y+=58) {
+      if(y < H/2-52 || y > H/2+52) {
+        drawPixelTree(30,y,58,y+room*53);
+        drawPixelTree(W-28,y,58,y+room*71);
+      }
+    }
+
+    // four path hints
+    ctx.fillStyle="#c6ad6f";
+    ctx.fillRect(W/2-34,0,68,80);
+    ctx.fillRect(W/2-34,H-80,68,80);
+    ctx.fillRect(0,H/2-34,98,68);
+    ctx.fillRect(W-98,H/2-34,98,68);
+
+    // central stone marker
+    ctx.fillStyle="#5e665e";
+    ctx.fillRect(W/2-38,H/2-25,76,50);
+    ctx.fillStyle="#242b26";
+    ctx.font="bold 15px monospace";
+    ctx.textAlign="center";
+    ctx.fillText("?",W/2,H/2+6);
+
+    // border vignette
+    const g = ctx.createRadialGradient(W/2,H/2,90,W/2,H/2,390);
+    g.addColorStop(0,"#0000"); g.addColorStop(1,"#061006aa");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  }
+
+  function drawHero() {
+    const x=Math.round(player.x), y=Math.round(player.y);
+    // shadow
+    ctx.fillStyle="#0008";ctx.fillRect(x-11,y+12,22,7);
+    // body
+    ctx.fillStyle="#e7c47a";ctx.fillRect(x-8,y-8,16,14);
+    ctx.fillStyle="#4fa43b";ctx.fillRect(x-10,y+4,20,18);
+    // cap
+    ctx.fillStyle="#2f812f";ctx.fillRect(x-13,y-14,22,8);ctx.fillRect(x-17,y-10,13,6);
+    // legs
+    ctx.fillStyle="#6e3e22";ctx.fillRect(x-9,y+22,7,9);ctx.fillRect(x+2,y+22,7,9);
+    // shield
+    ctx.fillStyle="#8f3a2e";ctx.fillRect(x+9,y+4,8,14);
+    ctx.fillStyle="#e6a840";ctx.fillRect(x+11,y+8,4,6);
+  }
+
+  function draw() {
+    drawForest();
+    drawHero();
+    if(won) {
+      ctx.fillStyle="#0009";ctx.fillRect(0,0,W,H);
+      ctx.fillStyle="#f0c34a";ctx.font="bold 34px monospace";ctx.textAlign="center";
+      ctx.fillText("FOREST CLEARED",W/2,H/2-8);
+      ctx.fillStyle="#fff";ctx.font="18px monospace";ctx.fillText("The route was correct.",W/2,H/2+28);
+    }
+  }
+
+  function updateSequence() {
+    const padded = ["—","—","—","—"];
+    history.slice(-4).forEach((d,i)=>padded[4-Math.min(4,history.length)+i]=d);
+    sequenceEl.textContent = padded.join(" ");
+  }
+
+  function chime() {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const notes=[523.25,659.25,783.99,1046.5];
+      notes.forEach((f,i)=>{
+        const o=ac.createOscillator(), gain=ac.createGain();
+        o.type="square";o.frequency.value=f;
+        gain.gain.setValueAtTime(.0001,ac.currentTime+i*.09);
+        gain.gain.exponentialRampToValueAtTime(.06,ac.currentTime+i*.09+.015);
+        gain.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+i*.09+.18);
+        o.connect(gain);gain.connect(ac.destination);
+        o.start(ac.currentTime+i*.09);o.stop(ac.currentTime+i*.09+.19);
+      });
+    } catch(e) {}
+  }
+
+  function recordDirection(dir) {
+    if(won || transitionLock>0) return;
+    transitionLock = 14;
+    history.push(dir);
+    if(history.length>4) history.shift();
+    room++;
+    roomEl.textContent = String(room).padStart(2,"0");
+    updateSequence();
+    flash.classList.add("on");setTimeout(()=>flash.classList.remove("on"),150);
+    if(history.length===4 && history.join("")===solution) {
+      won=true;
+      chime();
+      successEl.classList.add("show");
+      successEl.scrollIntoView({behavior:"smooth",block:"nearest"});
+    }
+  }
+
+  function resetPositionFor(dir) {
+    if(dir==="W") { player.x=W-player.r-4; player.y=H/2; }
+    if(dir==="E") { player.x=player.r+4; player.y=H/2; }
+    if(dir==="N") { player.y=H-player.r-4; player.x=W/2; }
+    if(dir==="S") { player.y=player.r+4; player.x=W/2; }
+  }
+
+  function update() {
+    if(transitionLock>0) transitionLock--;
+    if(!won) {
+      let dx=(keys.right?1:0)-(keys.left?1:0);
+      let dy=(keys.down?1:0)-(keys.up?1:0);
+      if(dx&&dy){dx*=.707;dy*=.707}
+      player.x += dx*player.speed;
+      player.y += dy*player.speed;
+
+      if(player.x < -player.r) { recordDirection("W"); resetPositionFor("W"); }
+      else if(player.x > W+player.r) { recordDirection("E"); resetPositionFor("E"); }
+      else if(player.y < -player.r) { recordDirection("N"); resetPositionFor("N"); }
+      else if(player.y > H+player.r) { recordDirection("S"); resetPositionFor("S"); }
+    }
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  const mapKey = (key,down) => {
+    const k=key.toLowerCase();
+    if(k==="arrowleft"||k==="a") keys.left=down;
+    if(k==="arrowright"||k==="d") keys.right=down;
+    if(k==="arrowup"||k==="w") keys.up=down;
+    if(k==="arrowdown"||k==="s") keys.down=down;
+  };
+  window.addEventListener("keydown",e=>{ if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","w","a","s","d","W","A","S","D"].includes(e.key)) e.preventDefault(); mapKey(e.key,true); });
+  window.addEventListener("keyup",e=>mapKey(e.key,false));
+  window.addEventListener("blur",()=>keys={left:false,right:false,up:false,down:false});
+
+  document.querySelectorAll("[data-dir]").forEach(btn=>{
+    const dir=btn.dataset.dir;
+    const set=v=>{keys[dir]=v;btn.classList.toggle("active",v)};
+    btn.addEventListener("pointerdown",e=>{e.preventDefault();set(true);btn.setPointerCapture(e.pointerId)});
+    btn.addEventListener("pointerup",()=>set(false));
+    btn.addEventListener("pointercancel",()=>set(false));
+    btn.addEventListener("pointerleave",()=>set(false));
+  });
+
+  resetBtn.addEventListener("click",()=>{
+    history=[];won=false;room=1;player.x=W/2;player.y=H/2;successEl.classList.remove("show");roomEl.textContent="01";updateSequence();
+  });
+
+  updateSequence();
+  draw();
+  requestAnimationFrame(update);
+})();
+</script>
+</body>
+</html>
