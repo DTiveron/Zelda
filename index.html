@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#101510" />
-  <title>AMAZING RACE</title>
+  <title>DHS SHIELD // Lost Forest</title>
   <style>
     :root {
       --bg:#0c100d; --panel:#151b17; --ink:#f7f2df; --muted:#abb8ad;
@@ -51,8 +51,8 @@
 <body>
 <main>
   <section class="masthead">
-    <div class="eyebrow">AMAZING RACE</div>
-    <h1 id="heading">ZELDA LOST FOREST</h1>
+    <div class="eyebrow">DEERFIELD HIGH SCHOOL // SHIELD SYSTEM</div>
+    <h1 id="heading">LOST FOREST PROTOCOL</h1>
     <p class="intro" id="intro"></p>
   </section>
 
@@ -91,11 +91,11 @@
 (() => {
   const cfg = window.GAME_CONFIG || {};
   document.title = cfg.pageTitle || 'Lost Forest';
-  document.getElementById('heading').textContent = cfg.heading || 'ZELDA LOST FOREST';
+  document.getElementById('heading').textContent = cfg.heading || 'LOST FOREST PROTOCOL';
   document.getElementById('intro').textContent = cfg.intro || 'Escape the forest.';
   document.getElementById('successHeading').textContent = cfg.successHeading || 'ACCESS GRANTED';
   document.getElementById('successSubheading').textContent = cfg.successSubheading || 'The forest has released you.';
-  document.getElementById('finalClue').textContent = cfg.finalClue || 'PUBLIC LIBRARY';
+  document.getElementById('finalClue').textContent = cfg.finalClue || 'YOUR NEXT CLUE GOES HERE';
 
   const solution = (cfg.solution || ['N','W','S','W']).join('');
   const canvas = document.getElementById('game');
@@ -209,10 +209,14 @@
   }
 
   function resetAfterExit(dir) {
-    if (dir==='N') { player.x=W/2; player.y=H-26; }
-    if (dir==='S') { player.x=W/2; player.y=26; }
-    if (dir==='W') { player.x=W-26; player.y=H/2; }
-    if (dir==='E') { player.x=26; player.y=H/2; }
+    // Re-enter through the opposite opening. North/South must respawn
+    // at the actual center of the only vertical passage, not canvas center.
+    const verticalExitX = (exits.N.x1 + exits.N.x2) / 2;
+    const horizontalExitY = (exits.W.y1 + exits.W.y2) / 2;
+    if (dir==='N') { player.x=verticalExitX; player.y=H-26; }
+    if (dir==='S') { player.x=verticalExitX; player.y=26; }
+    if (dir==='W') { player.x=W-26; player.y=horizontalExitY; }
+    if (dir==='E') { player.x=26; player.y=horizontalExitY; }
   }
 
   function handleExit() {
