@@ -1,7 +1,7 @@
 window.GAME_CONFIG = {
-  pageTitle: "DHS SHIELD // Lost Forest",
-  heading: "LOST FOREST PROTOCOL",
-  intro: "Escape the forest. The correct four exits will unlock the next clue.",
+  pageTitle: "AMAZING RACE",
+  heading: "ZELDA LOST FOREST",
+  intro: "Escape the forest to unlock the next clue.",
 
   // EDIT THIS LINE to change what appears after the team solves the puzzle.
   finalClue: "PUBLIC LIBRARY",
