@@ -4,7 +4,7 @@ window.GAME_CONFIG = {
   intro: "Escape the forest. The correct four exits will unlock the next clue.",
 
   // EDIT THIS LINE to change what appears after the team solves the puzzle.
-  finalClue: "YOUR NEXT CLUE GOES HERE",
+  finalClue: "PUBLIC LIBRARY",
 
   successHeading: "ACCESS GRANTED",
   successSubheading: "The forest has released you.",
